@@ -1,0 +1,67 @@
+edition: 1.0.0
+name: hello-world-app
+access: "default"
+
+vars: # 全局变量
+  region: "cn-hangzhou"
+  service:
+    name: "hello-world-service"
+    description: 'hello world by serverless devs'
+
+services:
+  helloworld: # 业务名称/模块名称
+    component: fc # 组件名称
+    props:
+      region: ${vars.region} 
+      service: ${vars.service}
+      function:
+        name: "start-fc-http-nodejs14"
+        description: 'hello world by serverless devs'
+        runtime: nodejs14
+        codeUri: ./code
+        handler: index.handler
+        memorySize: 128
+        timeout: 60
+      triggers:
+        - name: httpTrigger
+          type: http
+          config:
+            authType: anonymous
+            methods:
+              - GET
+      customDomains:
+        - domainName: auto
+          protocol: HTTP
+          routeConfigs:
+            - path: /*
+              methods:
+                - GET
+                - POST
+
+  helper: # 辅助函数, 2 min 定时预热
+    component: fc  # 组件名称
+    actions:
+      post-deploy: 
+        - component: fc invoke
+    props: # 组件的属性值
+      region: ${vars.region}
+      service: ${vars.service}
+      function:
+        name: keep-warm
+        description: 'Serverless Devs Web Framework Helper Function'
+        codeUri: './helper'
+        handler: index.handler
+        runtime: python3
+        timeout: 120
+        memorySize: 128
+        instanceConcurrency: 1
+        environmentVariables:
+          KODBOX_URL: ${helloworld.output.url.custom_domain[0].domain}
+      triggers:
+        - name: timerTrigger     
+          type: timer   
+          # qualifier: LATEST    
+          config:    
+            payload: '{}'    
+            cronExpression: '@every 60m'    
+            enable: true
